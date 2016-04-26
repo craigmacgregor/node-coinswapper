@@ -3,7 +3,6 @@ const bitcoin = require('bitcoin')
 const app = express()
 
 app.get('/', function (req, res) {
-  res.send('Hello World!')
 
   const client = new bitcoin.Client({
     host: 'localhost',
@@ -15,7 +14,7 @@ app.get('/', function (req, res) {
 
   client.getBalance('*', 6, function(err, balance, resHeaders) {
     if (err) return console.log(err)
-    console.log('Balance:', balance)
+    res.status(200).send('Balance: ' + balance)
   })
 })
 
