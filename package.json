@@ -1,0 +1,23 @@
+{
+  "name": "node-coinswapper",
+  "version": "1.0.0",
+  "description": "Node Application to Swap Crypto Currencies",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/craigmacgregor/node-coinswapper.git"
+  },
+  "author": "Craig MacGregor",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/craigmacgregor/node-coinswapper/issues"
+  },
+  "homepage": "https://github.com/craigmacgregor/node-coinswapper#readme",
+  "dependencies": {
+    "bitcoin": "^3.0.1",
+    "express": "^4.13.4"
+  }
+}
