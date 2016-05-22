@@ -65,29 +65,33 @@ const processTransaction = (pending) => {
   localNav1Client.getTransaction(pending.txid).then((fullTrans) => {
     console.log('gettransaction', fullTrans)
     const nav2UserAddress = fullTrans['tx-comment']
-    remoteNav2Client.validateAddress(nav2UserAddress).then((addressInfo) => {
-      console.log('validateaddress', addressInfo)
-      if (addressInfo.isValid) {
-        sendNav2(nav2UserAddress, pending)
-      } else {
-        writeLog('005', 'invalid address', {
-          nav2UserAddress,
-          pending,
-          fullTrans,
-        })
-        getOrigin(pending)
-      }
-    }).error((err) => {
-      writeLog('004', 'failed validateAddress', {
-        error: err,
-        pending,
-        fullTrans,
-      })
-    })
+    validateNav2Address(nav2UserAddress, pending, fullTrans)
   }).error((err) => {
     writeLog('003', 'failed gettransaction', {
       error: err,
       pending,
+    })
+  })
+}
+
+const validateNav2Address = (nav2UserAddress, pending, fullTrans) => {
+  remoteNav2Client.validateAddress(nav2UserAddress).then((addressInfo) => {
+    console.log('validateaddress', addressInfo)
+    if (addressInfo.isValid) {
+      sendNav2(nav2UserAddress, pending)
+    } else {
+      writeLog('005', 'invalid address', {
+        nav2UserAddress,
+        pending,
+        fullTrans,
+      })
+      getOrigin(pending)
+    }
+  }).error((err) => {
+    writeLog('004', 'failed validateAddress', {
+      error: err,
+      pending,
+      fullTrans,
     })
   })
 }
@@ -97,7 +101,6 @@ const sendNav2 = (nav2UserAddress, pending) => {
 
   remoteNav2Client.sendToAddress(nav2UserAddress, pending.amount).then((sendOutcome) => {
     console.log('sendOutcome', sendOutcome)
-    // @TODO check if successfully sent
     if (sendOutcome.txid) {
       burnNav1(pending)
     } else {
@@ -129,23 +132,7 @@ const burnNav1 = (pending) => {
   }]
 
   localNav1Client.createRawTransaction(spentTransactions, outgoingTransactions).then((rawTrans) => {
-    localNav1Client.signRawTransaction(rawTrans).then((signedRaw) => {
-      localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
-        console.log('burnNav1 rawOutcome', rawOutcome)
-      }).error((err) => {
-        writeLog('010', 'failed sendRawTransaction', {
-          error: err,
-          pending,
-          signedRaw,
-        })
-      })
-    }).error((err) => {
-      writeLog('009', 'failed signRawTransaction', {
-        error: err,
-        pending,
-        rawTrans,
-      })
-    })
+    signBurnTx(rawTrans, pending)
   }).error((err) => {
     writeLog('008', 'failed createRawTransaction', {
       error: err,
@@ -156,38 +143,74 @@ const burnNav1 = (pending) => {
   })
 }
 
+const signBurnTx = (rawTrans, pending) => {
+  localNav1Client.signRawTransaction(rawTrans).then((signedRaw) => {
+    sendBurnTx(signedRaw, pending)
+  }).error((err) => {
+    writeLog('009', 'failed signRawTransaction', {
+      error: err,
+      pending,
+      rawTrans,
+    })
+  })
+}
+
+const sendBurnTx = (signedRaw, pending) => {
+  localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
+    console.log('burnNav1 rawOutcome', rawOutcome)
+  }).error((err) => {
+    writeLog('010', 'failed sendRawTransaction', {
+      error: err,
+      pending,
+      signedRaw,
+    })
+  })
+}
+
 const getOrigin = (pending) => {
   localNav1Client.getRawTransaction(pending.txid).then((incomingRaw) => {
-    localNav1Client.decodeRawTransaction(incomingRaw).then((incomingTrans) => {
-      localNav1Client.getRawTransaction(incomingTrans.vin[0].txid).then((inputRaw) => {
-        localNav1Client.decodeRawTransaction(inputRaw).then((inputTrans) => {
-          const origin = inputTrans.vout[incomingTrans.vin[0].vout].scriptPubKey.addresses[0]
-          sendNav1(origin, pending)
-        }).error((err) => {
-          writeLog('014', 'failed decodeRawTransaction', {
-            error: err,
-            pending,
-            inputRaw,
-          })
-        })
-      }).error((err) => {
-        writeLog('013', 'failed getRawTransaction', {
-          error: err,
-          pending,
-          incomingTrans,
-        })
-      })
-    }).error((err) => {
-      writeLog('012', 'failed decodeRawTransaction', {
-        error: err,
-        pending,
-        incomingRaw,
-      })
-    })
+    decodeOriginRaw(incomingRaw, pending)
   }).error((err) => {
     writeLog('011', 'failed getRawTransaction', {
       error: err,
       pending,
+    })
+  })
+}
+
+const decodeOriginRaw = (incomingRaw, pending) => {
+  localNav1Client.decodeRawTransaction(incomingRaw).then((incomingTrans) => {
+    getOriginRaw(incomingTrans, pending)
+  }).error((err) => {
+    writeLog('012', 'failed decodeRawTransaction', {
+      error: err,
+      pending,
+      incomingRaw,
+    })
+  })
+}
+
+const getOriginRaw = (incomingTrans, pending) => {
+  localNav1Client.getRawTransaction(incomingTrans.vin[0].txid).then((inputRaw) => {
+    decodeOriginInputRaw(inputRaw, incomingTrans, pending)
+  }).error((err) => {
+    writeLog('013', 'failed getRawTransaction', {
+      error: err,
+      pending,
+      incomingTrans,
+    })
+  })
+}
+
+const decodeOriginInputRaw = (inputRaw, incomingTrans, pending) => {
+  localNav1Client.decodeRawTransaction(inputRaw).then((inputTrans) => {
+    const origin = inputTrans.vout[incomingTrans.vin[0].vout].scriptPubKey.addresses[0]
+    sendNav1(origin, pending)
+  }).error((err) => {
+    writeLog('014', 'failed decodeRawTransaction', {
+      error: err,
+      pending,
+      inputRaw,
     })
   })
 }
@@ -204,29 +227,37 @@ const sendNav1 = (origin, pending) => {
   }]
 
   localNav1Client.createRawTransaction(spentTransactions, outgoingTransactions).then((rawTrans) => {
-    localNav1Client.signRawTransaction(rawTrans).then((signedRaw) => {
-      localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
-        console.log('returnNav1 rawOutcome', rawOutcome)
-      }).error((err) => {
-        writeLog('017', 'failed sendRawTransaction', {
-          error: err,
-          pending,
-          signedRaw,
-        })
-      })
-    }).error((err) => {
-      writeLog('016', 'failed signRawTransaction', {
-        error: err,
-        pending,
-        rawTrans,
-      })
-    })
+    signNav1Raw(rawTrans, pending)
   }).error((err) => {
     writeLog('015', 'failed createRawTransaction', {
       error: err,
       pending,
       spentTransactions,
       outgoingTransactions,
+    })
+  })
+}
+
+const signNav1Raw = (rawTrans, pending) => {
+  localNav1Client.signRawTransaction(rawTrans).then((signedRaw) => {
+    sendNav1Raw(signedRaw, pending)
+  }).error((err) => {
+    writeLog('016', 'failed signRawTransaction', {
+      error: err,
+      pending,
+      rawTrans,
+    })
+  })
+}
+
+const sendNav1Raw = (signedRaw, pending) => {
+  localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
+    console.log('returnNav1 rawOutcome', rawOutcome)
+  }).error((err) => {
+    writeLog('017', 'failed sendRawTransaction', {
+      error: err,
+      pending,
+      signedRaw,
     })
   })
 }
