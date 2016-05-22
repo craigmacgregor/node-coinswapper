@@ -19,8 +19,13 @@
   },
   "homepage": "https://github.com/craigmacgregor/node-coinswapper#readme",
   "dependencies": {
-    "bitcoin": "^3.0.1",
-    "express": "^4.13.4"
+    "babel-eslint": "^6.0.4",
+    "bitcoin-core": "^1.0.0",
+    "eslint-config-airbnb": "^8.0.0",
+    "eslint-plugin-import": "^1.6.1",
+    "eslint-plugin-jsx-a11y": "^1.0.4",
+    "eslint-plugin-react": "^5.0.1",
+    "lodash": "^4.11.2"
   },
   "devDependencies": {
     "babel-cli": "^6.7.7",

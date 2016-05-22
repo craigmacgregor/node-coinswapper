@@ -1,13 +1,33 @@
 {
-"parserOptions": {
-    "ecmaVersion": 6,
-    "sourceType": "module",
-    "ecmaFeatures": {
-      "jsx": true
-    }
+  "parser"  : "babel-eslint",
+  "extends" : [
+    "airbnb"
+  ],
+  "env"     : {
+    "browser" : true
+  },
+  "globals": {
+    "Action": false,
+    "DEVELOPMENT": false,
+    "PRODUCTION": false,
+    "__DEBUG__": false,
+    "sinon": false,
+    "expect": false,
+    "assert": false,
+    "it": false,
+    "describe": false,
+    "before": false,
+    "after": false,
+    "beforeEach": false,
+    "afterEach": false
   },
   "rules": {
-    "semi": ["error", "always"],
-    "quotes": ["error", "double"]
+    "semi" : [2, "never"],
+    "max-len": [2, 140, 2],
+    "arrow-body-style": [0, "as-needed"],
+    "no-use-before-define": 0,
+    "new-cap": 0,
+    "no-console": 0,
+    "prefer-template": 0
   }
 }
