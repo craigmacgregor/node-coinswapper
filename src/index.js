@@ -143,8 +143,7 @@ const signBurnTx = (rawTrans, pending) => {
 const sendBurnTx = (signedRaw, pending) => {
   localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
     console.log('Success!')
-    writeLog('010', 'failed sendRawTransaction', {
-      message: 'SUCCESS!',
+    writeLog('200', 'Success!', {
       rawOutcome,
       pending,
       signedRaw,
