@@ -5,17 +5,20 @@ const fs = require('fs')
 
 // --------- Settings ---------
 
-const nav1Receiving = 'sNszCRJXUKbP7GZ9QMy5wbxximm2WCBtCg'
-const nav1BurnAddress = 'sV7wPhehHDxAr4Gi5dKnSuE9vqf7DTVrZ4'
+// NOTE: nav1Receiving and nav1BurnAddress need to be in different wallet.dat files
+
+const nav1Receiving = '*'
+const nav1BurnAddress = '*'
 const nav1RcpUser = '*'
 const nav1RcpPass = '*'
 const rcpPort = 44444
 
 const nav2RcpUser = '*'
 const nav2RcpPass = '*'
-const nav2IPAddress = '192.168.1.8'
+const nav2IPAddress = '*'
 
 const txFee = 0.01
+const scriptInterval = 120 * 1000 // 120 seconds
 
 // --------- Initialisation ---------
 
@@ -32,21 +35,21 @@ const remoteNav2Client = new Client({
   host: nav2IPAddress,
 })
 
-localNav1Client.getInfo().then((info) => getUnspent(info)).error((err) => {
-  writeLog('001', 'failed getInfo', err)
-})
+setInterval(() => {
+  localNav1Client.getInfo().then(() => getUnspent()).catch((err) => {
+    writeLog('001', 'failed getInfo', err)
+  })
+}, scriptInterval)
 
 // --------- Functions ---------
 
-const getUnspent = (info) => {
-  console.log('localNav1Client', info)
-  localNav1Client.listUnspent().then((unspent) => filterUnspent(unspent)).error((err) => {
+const getUnspent = () => {
+  localNav1Client.listUnspent().then((unspent) => filterUnspent(unspent)).catch((err) => {
     writeLog('002', 'failed listUnspent', err)
   })
 }
 
 const filterUnspent = (unspent) => {
-  // console.log('listUnspent', unspent)
   let hasPending = false
 
   for (const pending of unspent) {
@@ -56,17 +59,14 @@ const filterUnspent = (unspent) => {
     }
   }
 
-  if (!hasPending) console.log('nothing to process')
+  if (!hasPending) console.log('Nothing to process')
 }
 
 const processTransaction = (pending) => {
-  console.log('processTransaction', pending)
-
   localNav1Client.getTransaction(pending.txid).then((fullTrans) => {
-    console.log('gettransaction', fullTrans)
     const nav2UserAddress = fullTrans['tx-comment']
     validateNav2Address(nav2UserAddress, pending, fullTrans)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('003', 'failed gettransaction', {
       error: err,
       pending,
@@ -76,18 +76,18 @@ const processTransaction = (pending) => {
 
 const validateNav2Address = (nav2UserAddress, pending, fullTrans) => {
   remoteNav2Client.validateAddress(nav2UserAddress).then((addressInfo) => {
-    console.log('validateaddress', addressInfo)
-    if (addressInfo.isValid) {
+    if (addressInfo.isvalid) {
       sendNav2(nav2UserAddress, pending)
     } else {
       writeLog('005', 'invalid address', {
         nav2UserAddress,
         pending,
         fullTrans,
+        addressInfo,
       })
       getOrigin(pending)
     }
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('004', 'failed validateAddress', {
       error: err,
       pending,
@@ -97,11 +97,8 @@ const validateNav2Address = (nav2UserAddress, pending, fullTrans) => {
 }
 
 const sendNav2 = (nav2UserAddress, pending) => {
-  console.log('sendNav2', pending, nav2UserAddress)
-
-  remoteNav2Client.sendToAddress(nav2UserAddress, pending.amount).then((sendOutcome) => {
-    console.log('sendOutcome', sendOutcome)
-    if (sendOutcome.txid) {
+  remoteNav2Client.sendToAddress(nav2UserAddress, parseFloat(pending.amount)).then((sendOutcome) => {
+    if (sendOutcome) {
       burnNav1(pending)
     } else {
       writeLog('007', 'failed to send the transaction', {
@@ -111,7 +108,7 @@ const sendNav2 = (nav2UserAddress, pending) => {
       })
       getOrigin(pending)
     }
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('006', 'failed sendToAddress', {
       error: err,
       pending,
@@ -121,8 +118,6 @@ const sendNav2 = (nav2UserAddress, pending) => {
 }
 
 const burnNav1 = (pending) => {
-  console.log('burnNav1', pending)
-
   const outgoingTransactions = {}
   outgoingTransactions[nav1BurnAddress] = pending.amount - txFee
 
@@ -133,7 +128,7 @@ const burnNav1 = (pending) => {
 
   localNav1Client.createRawTransaction(spentTransactions, outgoingTransactions).then((rawTrans) => {
     signBurnTx(rawTrans, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('008', 'failed createRawTransaction', {
       error: err,
       pending,
@@ -146,7 +141,7 @@ const burnNav1 = (pending) => {
 const signBurnTx = (rawTrans, pending) => {
   localNav1Client.signRawTransaction(rawTrans).then((signedRaw) => {
     sendBurnTx(signedRaw, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('009', 'failed signRawTransaction', {
       error: err,
       pending,
@@ -157,8 +152,14 @@ const signBurnTx = (rawTrans, pending) => {
 
 const sendBurnTx = (signedRaw, pending) => {
   localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
-    console.log('burnNav1 rawOutcome', rawOutcome)
-  }).error((err) => {
+    console.log('Success!')
+    writeLog('010', 'failed sendRawTransaction', {
+      message: 'SUCCESS!',
+      rawOutcome,
+      pending,
+      signedRaw,
+    })
+  }).catch((err) => {
     writeLog('010', 'failed sendRawTransaction', {
       error: err,
       pending,
@@ -170,7 +171,7 @@ const sendBurnTx = (signedRaw, pending) => {
 const getOrigin = (pending) => {
   localNav1Client.getRawTransaction(pending.txid).then((incomingRaw) => {
     decodeOriginRaw(incomingRaw, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('011', 'failed getRawTransaction', {
       error: err,
       pending,
@@ -181,7 +182,7 @@ const getOrigin = (pending) => {
 const decodeOriginRaw = (incomingRaw, pending) => {
   localNav1Client.decodeRawTransaction(incomingRaw).then((incomingTrans) => {
     getOriginRaw(incomingTrans, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('012', 'failed decodeRawTransaction', {
       error: err,
       pending,
@@ -193,7 +194,7 @@ const decodeOriginRaw = (incomingRaw, pending) => {
 const getOriginRaw = (incomingTrans, pending) => {
   localNav1Client.getRawTransaction(incomingTrans.vin[0].txid).then((inputRaw) => {
     decodeOriginInputRaw(inputRaw, incomingTrans, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('013', 'failed getRawTransaction', {
       error: err,
       pending,
@@ -206,7 +207,7 @@ const decodeOriginInputRaw = (inputRaw, incomingTrans, pending) => {
   localNav1Client.decodeRawTransaction(inputRaw).then((inputTrans) => {
     const origin = inputTrans.vout[incomingTrans.vin[0].vout].scriptPubKey.addresses[0]
     sendNav1(origin, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('014', 'failed decodeRawTransaction', {
       error: err,
       pending,
@@ -216,8 +217,6 @@ const decodeOriginInputRaw = (inputRaw, incomingTrans, pending) => {
 }
 
 const sendNav1 = (origin, pending) => {
-  console.log('returnNav1', origin, pending)
-
   const outgoingTransactions = {}
   outgoingTransactions[origin] = pending.amount - txFee
 
@@ -228,7 +227,7 @@ const sendNav1 = (origin, pending) => {
 
   localNav1Client.createRawTransaction(spentTransactions, outgoingTransactions).then((rawTrans) => {
     signNav1Raw(rawTrans, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('015', 'failed createRawTransaction', {
       error: err,
       pending,
@@ -241,7 +240,7 @@ const sendNav1 = (origin, pending) => {
 const signNav1Raw = (rawTrans, pending) => {
   localNav1Client.signRawTransaction(rawTrans).then((signedRaw) => {
     sendNav1Raw(signedRaw, pending)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('016', 'failed signRawTransaction', {
       error: err,
       pending,
@@ -253,7 +252,7 @@ const signNav1Raw = (rawTrans, pending) => {
 const sendNav1Raw = (signedRaw, pending) => {
   localNav1Client.sendRawTransaction(signedRaw.hex).then((rawOutcome) => {
     console.log('returnNav1 rawOutcome', rawOutcome)
-  }).error((err) => {
+  }).catch((err) => {
     writeLog('017', 'failed sendRawTransaction', {
       error: err,
       pending,
