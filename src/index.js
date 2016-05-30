@@ -19,6 +19,14 @@ const remoteNav2Client = new Client({
   host: settings.nav2IPAddress,
 })
 
+// run on start up
+
+localNav1Client.getInfo().then(() => getUnspent()).catch((err) => {
+  writeLog('001', 'failed getInfo', err)
+})
+
+// then run every 2 minutes after that
+
 setInterval(() => {
   localNav1Client.getInfo().then(() => getUnspent()).catch((err) => {
     writeLog('001', 'failed getInfo', err)
