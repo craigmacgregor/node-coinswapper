@@ -2,44 +2,28 @@
 
 const Client = require('bitcoin-core')
 const fs = require('fs')
-
-// --------- Settings ---------
-
-// NOTE: nav1Receiving and nav1BurnAddress need to be in different wallet.dat files
-
-const nav1Receiving = '*'
-const nav1BurnAddress = '*'
-const nav1RcpUser = '*'
-const nav1RcpPass = '*'
-const rcpPort = 44444
-
-const nav2RcpUser = '*'
-const nav2RcpPass = '*'
-const nav2IPAddress = '*'
-
-const txFee = 0.01
-const scriptInterval = 120 * 1000 // 120 seconds
+const settings = require('./settings')
 
 // --------- Initialisation ---------
 
 const localNav1Client = new Client({
-  username: nav1RcpUser,
-  password: nav1RcpPass,
-  port: rcpPort,
+  username: settings.nav1RcpUser,
+  password: settings.nav1RcpPass,
+  port: settings.rcpPort,
 })
 
 const remoteNav2Client = new Client({
-  username: nav2RcpUser,
-  password: nav2RcpPass,
-  port: rcpPort,
-  host: nav2IPAddress,
+  username: settings.nav2RcpUser,
+  password: settings.nav2RcpPass,
+  port: settings.rcpPort,
+  host: settings.nav2IPAddress,
 })
 
 setInterval(() => {
   localNav1Client.getInfo().then(() => getUnspent()).catch((err) => {
     writeLog('001', 'failed getInfo', err)
   })
-}, scriptInterval)
+}, settings.scriptInterval)
 
 // --------- Functions ---------
 
@@ -53,7 +37,7 @@ const filterUnspent = (unspent) => {
   let hasPending = false
 
   for (const pending of unspent) {
-    if (pending.address === nav1Receiving) {
+    if (pending.address === settings.nav1Receiving) {
       hasPending = true
       processTransaction(pending)
     }
@@ -119,7 +103,7 @@ const sendNav2 = (nav2UserAddress, pending) => {
 
 const burnNav1 = (pending) => {
   const outgoingTransactions = {}
-  outgoingTransactions[nav1BurnAddress] = pending.amount - txFee
+  outgoingTransactions[settings.nav1BurnAddress] = pending.amount - settings.txFee
 
   const spentTransactions = [{
     txid: pending.txid,
@@ -218,7 +202,7 @@ const decodeOriginInputRaw = (inputRaw, incomingTrans, pending) => {
 
 const sendNav1 = (origin, pending) => {
   const outgoingTransactions = {}
-  outgoingTransactions[origin] = pending.amount - txFee
+  outgoingTransactions[origin] = pending.amount - settings.txFee
 
   const spentTransactions = [{
     txid: pending.txid,
