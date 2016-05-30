@@ -1,5 +1,3 @@
-'use strict'
-
 const Client = require('bitcoin-core')
 const fs = require('fs')
 const settings = require('./settings')
